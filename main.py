@@ -37,7 +37,8 @@ class Crawler:
         with open("data.txt", "w", encoding="utf-8") as file:
             for page in self.set_of_pages:
                 if len(page.child_pages) != 0:
-                    file.write(page.url + "\nCHILDREN: " + page.get_str_children() + "\n\n\n ------------------------\n")
+                    file.write(
+                        page.url + "\nCHILDREN: " + page.get_str_children() + "\n\n\n ------------------------\n")
 
     def start(self):
         for page in self.pages:
@@ -47,7 +48,10 @@ class Crawler:
         return False
 
     def __get_all_links_from_page(self, page: Page):
-        request = requests.get(page.url).text
+        try:
+            request = requests.get(page.url).text
+        except Exception:
+            return
         soup = BeautifulSoup(request, 'html.parser')
         for link in soup.findAll('a'):
             if 'href' in link.attrs:
