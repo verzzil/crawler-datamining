@@ -1,11 +1,14 @@
+import re
+
 import requests
 from bs4 import BeautifulSoup
 
 
 class Page:
-    def __init__(self, url: str):
+    def __init__(self, url: str, id: int):
         self.url: str = url
         self.child_pages = []
+        self.id = id
 
     def __eq__(self, other):
         if other.url == self.url:
@@ -24,78 +27,56 @@ class Page:
 
 class Crawler:
     def __init__(self, url_init_page: str):
-        self.pages = [Page(url_init_page)]
+        self.init_page = Page(url_init_page, 1)
+        self.pages = [self.init_page]
 
         self.set_of_pages = set()
-        self.set_of_pages.add(Page(url_init_page))
-
-        self.init_page = Page(url_init_page)
-
+        self.set_of_pages.add(url_init_page)
         self.url = url_init_page
 
     def write_to_file(self):
-        with open("data.txt", "w", encoding="utf-8") as file:
-            for page in self.set_of_pages:
+        with open(self.url[8:-1] + ".txt", "w", encoding="utf-8") as file:
+            for page in self.pages:
                 if len(page.child_pages) != 0:
                     file.write(
-                        page.url + "\nCHILDREN: " + page.get_str_children() + "\n\n\n ------------------------\n")
+                        page.url + " " + str(page.id) + ":" + page.get_str_children() + "\n")
 
     def start(self):
         for page in self.pages:
-            if len(self.pages) > 1000:
+            if page.id == 4:
                 return True
-            self.__get_all_links_from_page(page)
+            self.__get_all_links_from_page_with_nesting(page)
         return False
 
-    def __get_all_links_from_page(self, page: Page):
+    def __get_all_links_from_page_with_nesting(self, page: Page):
         try:
             request = requests.get(page.url).text
+            soup = BeautifulSoup(request, 'html.parser')
         except Exception:
             return
-        soup = BeautifulSoup(request, 'html.parser')
         for link in soup.findAll('a'):
             if 'href' in link.attrs:
 
                 if '#' in link.attrs['href'] or \
-                        'javascript:' in link.attrs['href']:
+                        'javascript:void' in link.attrs['href'] or \
+                        re.match(r'\S*[^/]*\.[^./]*$', link.attrs['href']):
                     continue
 
                 if not link.attrs['href'].startswith('http'):
-                    new_page = Page(page.url + link.attrs['href'])
+                    if link.attrs['href'].startswith('//'):
+                        new_page = Page("https://" + link.attrs['href'][2:], page.id + 1)
+                    else:
+                        new_page = Page(page.url[:len(page.url) - 1] + link.attrs['href'], page.id + 1)
                     page.add_children(new_page)
-                    # self.pages.append(new_page)
-                    self.set_of_pages.add(new_page)
                 else:
-                    new_page = Page(link.attrs['href'])
+                    new_page = Page(link.attrs['href'], page.id + 1)
                     page.add_children(new_page)
-                    # self.pages.append(new_page)
-                    self.set_of_pages.add(new_page)
 
-    def start_with_nesting(self):
-        for page in self.set_of_pages:
-            self.__get_all_links_from_page(page)
-            for sub_page in page.child_pages:
-                self.__get_all_links_from_page(sub_page)
-                for sub_sub_page in sub_page.child_pages:
-                    self.__get_all_links_from_page(sub_sub_page)
+                if not new_page.url in self.set_of_pages:
+                    self.pages.append(new_page)
+                    self.set_of_pages.add(new_page.url)
+
             self.write_to_file()
-
-    def __get_all_links_from_page_with_nesting(self, page: Page):
-        request = requests.get(page.url).text
-        soup = BeautifulSoup(request, 'html.parser')
-        for link in soup.findAll('a'):
-            if 'href' in link.attrs:
-
-                if '#' in link.attrs['href'] or \
-                        'javascript:void' in link.attrs['href']:
-                    continue
-
-                if not link.attrs['href'].startswith('http'):
-                    new_page = Page(page.url[:len(page.url) - 1] + link.attrs['href'])
-                    page.add_children(new_page)
-                else:
-                    new_page = Page(link.attrs['href'])
-                    page.add_children(new_page)
 
     def get_dict_from_pages(self):
         result = {}
@@ -112,8 +93,9 @@ class Crawler:
 
 
 if __name__ == '__main__':
-    crawler = Crawler('https://keddr.com/')
-    crawler.start_with_nesting()
+    url = input()
+    crawler = Crawler(url)
+    print(crawler.start())
 
     crawler.write_to_file()
 
