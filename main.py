@@ -5,18 +5,19 @@ from bs4 import BeautifulSoup
 
 
 class Page:
-    def __init__(self, url: str, id: int):
+    def __init__(self, url: str, id: int, children=[]):
         self.url: str = url
-        self.child_pages = []
+        self.child_pages = children
         self.id = id
 
     def __eq__(self, other):
-        if other.url == self.url:
-            return True
-        return False
+        return other.url == self.url
 
     def __hash__(self):
         return self.url.__hash__()
+
+    def __str__(self):
+        return "url: " + url + " id: " + id
 
     def add_children(self, page):
         self.child_pages.append(page)
